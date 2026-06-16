@@ -489,37 +489,61 @@
   }
 
   /* ---------- enviar por WhatsApp / Email ---------- */
+  function puedeCompartirArchivos(){
+    // true en móvil (y en Edge de Windows): el sistema adjunta el PDF solo
+    try{
+      const dummy = new File([new Blob(['x'], {type:'application/pdf'})], 'x.pdf', {type:'application/pdf'});
+      return !!(navigator.canShare && navigator.canShare({files:[dummy]}));
+    }catch(_){ return false; }
+  }
+
   async function enviar(canal){
     if(typeof html2pdf === 'undefined'){
       toast('Necesitas conexión a internet la primera vez para preparar el PDF.');
       return;
     }
-    toast('Generando el PDF…', 6000);
-    let r;
-    try{ r = await generarPDF(); }
-    catch(e){ toast('No se pudo generar el PDF.'); return; }
-
-    const {blob, filename, d} = r;
-    const file = new File([blob], filename, {type:'application/pdf'});
+    const d = datos();
     const texto = `Hola, le adjunto la factura nº ${d.num} por un importe total de ${d.total}. Un saludo, ${d.emisor}.`;
+    const compartir = puedeCompartirArchivos();
 
-    // MÓVIL: comparte el PDF ya adjunto al menú nativo (WhatsApp, correo, etc.)
-    if(navigator.canShare && navigator.canShare({files:[file]})){
-      try{
-        await navigator.share({files:[file], title:'Factura ' + d.num, text:texto});
-        return;
-      }catch(e){ if(e && e.name === 'AbortError') return; /* si no, sigue al plan B */ }
+    // En ORDENADOR abrimos WhatsApp en el mismo clic, así el navegador no lo bloquea
+    let waWin = null;
+    if(!compartir && canal === 'whatsapp'){
+      waWin = window.open('https://wa.me/?text=' + encodeURIComponent(texto), '_blank');
     }
 
-    // ORDENADOR: descarga el PDF y abre el canal con el mensaje escrito
-    descargar(blob, filename);
-    if(canal === 'whatsapp'){
-      window.open('https://wa.me/?text=' + encodeURIComponent(texto), '_blank');
-      toast('PDF descargado. Adjúntalo en el WhatsApp que se ha abierto (arrástralo al chat).', 6000);
-    } else {
-      const asunto = 'Factura nº ' + d.num + ' — ' + d.emisor;
-      window.location.href = 'mailto:?subject=' + encodeURIComponent(asunto) + '&body=' + encodeURIComponent(texto);
-      toast('PDF descargado. Adjúntalo en el correo que se ha abierto.', 6000);
+    const btn = document.querySelector(canal === 'whatsapp' ? '.wa' : '.mail');
+    const prev = btn ? btn.textContent : '';
+    if(btn){ btn.disabled = true; btn.textContent = 'Preparando…'; }
+    toast('Generando el PDF…', 9000);
+
+    try{
+      const {blob, filename} = await generarPDF();
+
+      // MÓVIL / Edge: menú de compartir con el PDF YA adjunto → solo elige chat o correo
+      if(compartir){
+        const file = new File([blob], filename, {type:'application/pdf'});
+        try{
+          await navigator.share({files:[file], title:'Factura ' + d.num, text:texto});
+          return;
+        }catch(e){ if(e && e.name === 'AbortError') return; /* si falla, plan B */ }
+      }
+
+      // ORDENADOR (Windows): descarga el PDF y deja el canal abierto con el mensaje escrito
+      descargar(blob, filename);
+      if(canal === 'whatsapp'){
+        if(!waWin) window.open('https://wa.me/?text=' + encodeURIComponent(texto), '_blank');
+        toast('La factura (PDF) está en tu carpeta Descargas. Arrástrala al chat de WhatsApp y elige el contacto.', 9000);
+      } else {
+        const asunto = 'Factura nº ' + d.num + ' — ' + d.emisor;
+        window.location.href = 'mailto:?subject=' + encodeURIComponent(asunto) + '&body=' + encodeURIComponent(texto);
+        toast('La factura (PDF) está en tu carpeta Descargas. Adjúntala al correo y pon el destinatario.', 9000);
+      }
+    }catch(e){
+      if(waWin) waWin.close();
+      toast('No se pudo preparar el PDF. Revisa tu internet e inténtalo de nuevo.', 7000);
+    }finally{
+      if(btn){ btn.disabled = false; btn.textContent = prev; }
     }
   }
 
