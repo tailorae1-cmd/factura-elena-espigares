@@ -166,6 +166,29 @@
   .ai-go:hover{background:#1d4677;}
   .ai-go:disabled{opacity:.6;cursor:default;}
 
+  /* ---------- móvil (no afecta a impresión/PDF gracias a :not(.exporting)) ---------- */
+  @media screen and (max-width:680px){
+    .toolbar{padding:10px 12px;gap:7px;}
+    .toolbar h1{width:100%;flex:none;font-size:13px;margin-bottom:2px;}
+    .toolbar button, .toolbar input{font-size:12.5px;}
+    .ai-panel{margin:14px 12px 0;padding:12px;}
+    .ai-actions{gap:8px;}
+    body:not(.exporting) .sheet{width:100%;min-height:auto;padding:22px 16px;}
+    body:not(.exporting) .head{flex-direction:column;gap:14px;}
+    body:not(.exporting) .brand{gap:12px;}
+    body:not(.exporting) .brand .mark{width:60px;height:60px;flex-basis:60px;}
+    body:not(.exporting) .brand .name .l1{font-size:18px;letter-spacing:2px;}
+    body:not(.exporting) .doc-meta{text-align:left;min-width:0;width:100%;}
+    body:not(.exporting) .doc-meta .title{font-size:26px;letter-spacing:5px;}
+    body:not(.exporting) .doc-meta table{margin-left:0;}
+    body:not(.exporting) .doc-meta td{padding:3px 14px 3px 0;text-align:left;}
+    body:not(.exporting) .parties{flex-direction:column;gap:14px;}
+    body:not(.exporting) .foot{flex-direction:column;gap:18px;}
+    body:not(.exporting) .totals{width:100%;flex:none;}
+    body:not(.exporting) table.items thead th{padding:9px 7px;font-size:10px;}
+    body:not(.exporting) table.items tbody td{padding:10px 7px;font-size:11.5px;}
+  }
+
   @media print{
     .toolbar, .ai-panel{display:none !important;}
     body{background:#fff;}
@@ -206,8 +229,11 @@
 <div class="toolbar">
   <h1>Plantilla de factura · Elena Espigares Martínez</h1>
   <span style="font-size:12px;color:rgba(255,255,255,.8)">IVA</span>
-  <input id="ivaPct" type="number" value="21" min="0" step="0.5" style="width:58px;padding:6px;border-radius:6px;border:1px solid rgba(255,255,255,.35);background:rgba(255,255,255,.1);color:#fff;font:inherit;text-align:center;">
+  <input id="ivaPct" type="number" value="21" min="0" step="0.5" style="width:54px;padding:6px;border-radius:6px;border:1px solid rgba(255,255,255,.35);background:rgba(255,255,255,.1);color:#fff;font:inherit;text-align:center;">
+  <span style="font-size:12px;color:rgba(255,255,255,.8)">Ret.</span>
+  <input id="retPct" type="number" value="7" min="0" step="0.5" style="width:54px;padding:6px;border-radius:6px;border:1px solid rgba(255,255,255,.35);background:rgba(255,255,255,.1);color:#fff;font:inherit;text-align:center;">
   <button onclick="addRow()">+ Línea</button>
+  <button onclick="toggleRet()" id="retToggle">Quitar retención</button>
   <button onclick="nuevaFactura()" title="Vacía cliente y conceptos; mantiene tus datos">Nueva factura</button>
   <span class="sep"></span>
   <button class="primary" onclick="imprimir()">🖨️ Imprimir / PDF</button>
@@ -331,6 +357,7 @@
         <tr><td class="head-cell" colspan="2">Resumen</td></tr>
         <tr><td class="k">Base imponible</td><td class="v num" id="base">0,00 €</td></tr>
         <tr class="sub"><td class="k">IVA (<span id="ivaLbl">21</span>%)</td><td class="v num" id="iva">0,00 €</td></tr>
+        <tr class="sub ret-row"><td class="k">Retención IRPF (<span id="retLbl">7</span>%)</td><td class="v num" id="ret">0,00 €</td></tr>
         <tr class="grand"><td class="k">TOTAL</td><td class="v num" id="total">0,00 €</td></tr>
       </table>
     </div>
@@ -351,6 +378,7 @@
   const AK_KEY = 'factura_elena_apikey';
   const MODEL  = 'claude-opus-4-8'; // IA que lee texto/foto. Cambia a 'claude-haiku-4-5' para gastar ~5x menos.
   const $ = id => document.getElementById(id);
+  let retEnabled = true; // retención IRPF activada por defecto (7%)
 
   const fmt = n => (n||0).toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2}) + ' €';
   const parseNum = s => {
@@ -374,10 +402,19 @@
     calc();
   }
 
+  function toggleRet(){
+    retEnabled = !retEnabled;
+    document.querySelector('.ret-row').style.display = retEnabled ? '' : 'none';
+    $('retToggle').textContent = retEnabled ? 'Quitar retención' : 'Añadir retención';
+    calc();
+  }
+
   /* ---------- cálculo ---------- */
   function calc(){
     const ivaPct = parseFloat($('ivaPct').value)||0;
+    const retPct = parseFloat($('retPct').value)||0;
     $('ivaLbl').textContent = ivaPct;
+    $('retLbl').textContent = retPct;
 
     let base = 0;
     document.querySelectorAll('#rows tr').forEach(tr=>{
@@ -390,9 +427,11 @@
     });
 
     const iva = base * ivaPct/100;
+    const ret = retEnabled ? base * retPct/100 : 0;
     $('base').textContent = fmt(base);
     $('iva').textContent  = fmt(iva);
-    $('total').textContent = fmt(base + iva);
+    $('ret').textContent  = '− ' + fmt(ret);
+    $('total').textContent = fmt(base + iva - ret);   // base + IVA − retención
     saveState();
   }
 
@@ -405,7 +444,9 @@
         cliente: $('clienteBody').innerHTML,
         rows:    $('rows').innerHTML,
         pay:     $('payBox').innerHTML,
-        iva:     $('ivaPct').value
+        iva:     $('ivaPct').value,
+        ret:     $('retPct').value,
+        retEnabled: retEnabled
       }));
     }catch(e){}
   }
@@ -419,13 +460,34 @@
       $('rows').innerHTML       = st.rows;
       $('payBox').innerHTML     = st.pay;
       if(st.iva!=null) $('ivaPct').value = st.iva;
+      if(st.ret!=null) $('retPct').value = st.ret;
+      if(typeof st.retEnabled === 'boolean') retEnabled = st.retEnabled;
+      document.querySelector('.ret-row').style.display = retEnabled ? '' : 'none';
+      $('retToggle').textContent = retEnabled ? 'Quitar retención' : 'Añadir retención';
       return true;
     }catch(e){ return false; }
   }
 
   /* ---------- nueva factura (mantiene tus datos, vacía cliente y conceptos) ---------- */
+  function nextNumero(s){
+    // incrementa el último grupo de dígitos conservando el formato: 2026/014 -> 2026/015
+    const m = String(s||'').match(/^(.*?)(\d+)(\D*)$/);
+    if(!m) return s;
+    const next = String(parseInt(m[2],10)+1).padStart(m[2].length,'0');
+    return m[1] + next + m[3];
+  }
+  function hoyDDMMYYYY(offset){
+    const d = new Date(); if(offset) d.setDate(d.getDate()+offset);
+    const p = n => String(n).padStart(2,'0');
+    return p(d.getDate()) + '/' + p(d.getMonth()+1) + '/' + d.getFullYear();
+  }
+
   function nuevaFactura(){
-    if(!confirm('¿Empezar una factura nueva? Se mantienen tus datos de emisor, IBAN e IVA; se vacían el cliente y los conceptos.')) return;
+    if(!confirm('¿Empezar una factura nueva? Se pone el número siguiente y la fecha de hoy; se mantienen tus datos (emisor, IBAN, IVA, retención) y se vacían el cliente y los conceptos.')) return;
+    const metas = document.querySelectorAll('#metaTable .v');
+    if(metas[0]) metas[0].textContent = nextNumero(metas[0].textContent);
+    if(metas[1]) metas[1].textContent = hoyDDMMYYYY(0);
+    if(metas[2]) metas[2].textContent = hoyDDMMYYYY(30);
     $('clienteBody').innerHTML =
       '<div class="nm" contenteditable>Nombre del cliente / Razón social</div>'+
       '<div class="row" contenteditable>NIF/CIF: </div>'+
@@ -434,7 +496,7 @@
       '<div class="row" contenteditable>&nbsp;</div>';
     $('rows').innerHTML = rowHTML();
     calc();
-    toast('Factura nueva lista. Acuérdate de cambiar el nº de factura.');
+    toast('Factura nº ' + (metas[0] ? metas[0].textContent : '') + ' lista (con la fecha de hoy).');
   }
 
   /* ---------- aviso flotante ---------- */
@@ -470,7 +532,7 @@
       margin: 0,
       filename,
       image: {type:'jpeg', quality:0.98},
-      html2canvas: {scale:2, useCORS:true, backgroundColor:'#ffffff'},
+      html2canvas: {scale:2, useCORS:true, backgroundColor:'#ffffff', windowWidth:1100, windowHeight:1600},
       jsPDF: {unit:'mm', format:'a4', orientation:'portrait'}
     };
     try{
@@ -669,6 +731,7 @@
 
   /* ---------- arranque ---------- */
   $('ivaPct').addEventListener('input', calc);
+  $('retPct').addEventListener('input', calc);
   $('aiPhoto').addEventListener('change', function(){
     $('aiPhotoName').textContent = this.files[0] ? this.files[0].name : '';
   });
