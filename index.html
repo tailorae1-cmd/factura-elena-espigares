@@ -1,0 +1,518 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Factura — Elena Espigares Martínez</title>
+<style>
+  :root{
+    --navy:#14335f;        /* azul marino del logo */
+    --navy-2:#1f4a82;
+    --blue:#2e6db4;        /* azul medio */
+    --blue-light:#57a8df;  /* azul claro */
+    --ink:#1c2733;
+    --muted:#6b7785;
+    --line:#d9e0e8;
+    --bg:#eef1f4;
+    --sheet:#ffffff;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    font-family:"Helvetica Neue",Arial,"Segoe UI",sans-serif;
+    color:var(--ink);
+    background:var(--bg);
+    -webkit-print-color-adjust:exact;
+    print-color-adjust:exact;
+  }
+
+  /* ---------- Barra de herramientas (no se imprime) ---------- */
+  .toolbar{
+    position:sticky;top:0;z-index:10;
+    background:var(--navy);
+    color:#fff;
+    display:flex;flex-wrap:wrap;gap:10px;align-items:center;
+    padding:12px 20px;
+    box-shadow:0 2px 10px rgba(0,0,0,.15);
+  }
+  .toolbar h1{font-size:14px;font-weight:600;margin:0;letter-spacing:.5px;flex:1;}
+  .toolbar button{
+    font:inherit;font-size:13px;font-weight:600;
+    border:1px solid rgba(255,255,255,.35);
+    background:rgba(255,255,255,.08);
+    color:#fff;border-radius:7px;padding:8px 14px;cursor:pointer;
+    transition:background .15s ease;
+  }
+  .toolbar button:hover{background:rgba(255,255,255,.22);}
+  .toolbar button.primary{background:var(--blue-light);border-color:var(--blue-light);color:#0c2440;}
+  .toolbar button.primary:hover{background:#79bdec;}
+  .toolbar .hint{font-size:11.5px;color:rgba(255,255,255,.7);width:100%;margin-top:2px;}
+
+  /* ---------- Hoja A4 ---------- */
+  .sheet{
+    width:210mm;min-height:297mm;
+    margin:24px auto;
+    background:var(--sheet);
+    padding:20mm 16mm 16mm;
+    box-shadow:0 6px 26px rgba(20,51,95,.16);
+    display:flex;
+    flex-direction:column;
+  }
+
+  /* ---------- Cabecera ---------- */
+  .head{display:flex;justify-content:space-between;align-items:flex-start;gap:24px;}
+  .brand{display:flex;align-items:center;gap:16px;}
+  .brand .mark{width:78px;height:78px;flex:0 0 78px;}
+  .brand .name{line-height:1.18;}
+  .brand .name .l1{font-size:22px;font-weight:700;letter-spacing:3px;color:var(--navy);}
+  .brand .name .l2{font-size:9.5px;font-weight:600;letter-spacing:3px;color:var(--blue);margin-top:3px;text-transform:uppercase;}
+
+  .doc-meta{text-align:right;min-width:230px;}
+  .doc-meta .title{
+    font-size:30px;font-weight:300;letter-spacing:8px;color:var(--navy);
+    text-transform:uppercase;
+  }
+  .doc-meta table{border-collapse:collapse;margin-left:auto;margin-top:10px;font-size:12px;}
+  .doc-meta td{padding:3px 0 3px 14px;text-align:right;}
+  .doc-meta td.k{color:var(--muted);font-weight:600;text-transform:uppercase;font-size:10px;letter-spacing:.5px;}
+  .doc-meta td.v{font-weight:600;color:var(--ink);min-width:120px;}
+
+  .rule{height:3px;background:var(--navy);margin:16px 0 0;border-radius:2px;}
+  .rule.thin{height:1px;background:var(--line);}
+
+  /* ---------- Bloques emisor / cliente ---------- */
+  .parties{display:flex;gap:20px;margin-top:34px;}
+  .party{flex:1;border:1px solid var(--line);border-radius:9px;overflow:hidden;}
+  .party h3{
+    margin:0;font-size:10.5px;letter-spacing:1.5px;text-transform:uppercase;
+    color:#fff;background:var(--navy);padding:7px 14px;font-weight:600;
+  }
+  .party.client h3{background:var(--blue);}
+  .party .body{padding:15px 16px;font-size:12.5px;line-height:1.85;}
+  .party .body .nm{font-weight:700;color:var(--navy);font-size:13.5px;}
+  .party .body .row span{color:var(--muted);}
+
+  /* ---------- Tabla de conceptos ---------- */
+  .items-box{
+    flex:1 1 auto;margin-top:34px;
+    border:1px solid var(--line);border-radius:9px;overflow:hidden;
+    display:flex;flex-direction:column;
+  }
+  table.items{width:100%;border-collapse:collapse;font-size:12.5px;}
+  table.items thead th{
+    background:var(--navy);color:#fff;font-weight:600;
+    font-size:10.5px;letter-spacing:.6px;text-transform:uppercase;
+    padding:11px 12px;text-align:right;
+  }
+  table.items thead th.concept{text-align:left;}
+  table.items tbody td{
+    padding:13px 12px;border-bottom:1px solid var(--line);
+    text-align:right;vertical-align:top;
+  }
+  table.items tbody td.concept{text-align:left;}
+  table.items tbody tr:nth-child(even){background:#f6f9fc;}
+  .num{font-variant-numeric:tabular-nums;}
+
+  /* ---------- Totales ---------- */
+  .foot{display:flex;justify-content:space-between;gap:30px;margin-top:26px;}
+  .pay{flex:1;font-size:11.5px;line-height:1.7;}
+  .pay h4{margin:0 0 6px;font-size:10.5px;letter-spacing:1px;text-transform:uppercase;color:var(--navy);}
+  .pay .box{border:1px solid var(--line);border-radius:9px;padding:11px 14px;background:#f6f9fc;}
+  .pay .box .iban{font-weight:700;color:var(--navy);font-variant-numeric:tabular-nums;letter-spacing:.5px;}
+
+  .totals{width:280px;flex:0 0 280px;}
+  .totals table{width:100%;border-collapse:collapse;font-size:12.5px;}
+  .totals td{padding:7px 12px;}
+  .totals td.k{color:var(--muted);}
+  .totals td.v{text-align:right;font-weight:600;font-variant-numeric:tabular-nums;}
+  .totals tr.sub td{border-bottom:1px solid var(--line);}
+  .totals tr.grand td{
+    background:var(--navy);color:#fff;font-size:15px;font-weight:700;
+    border-radius:0 0 8px 8px;
+  }
+  .totals tr.grand td.k{color:rgba(255,255,255,.85);font-weight:600;text-transform:uppercase;font-size:11px;letter-spacing:1px;}
+  .totals .head-cell{background:var(--blue);color:#fff;font-weight:600;text-transform:uppercase;font-size:10.5px;letter-spacing:1px;border-radius:8px 8px 0 0;}
+
+  /* ---------- Pie legal ---------- */
+  .legal{margin-top:22px;padding-top:14px;border-top:1px solid var(--line);
+    font-size:9.5px;color:var(--muted);line-height:1.6;text-align:center;}
+  .legal b{color:var(--navy);}
+
+  /* campos editables */
+  [contenteditable]{outline:none;border-radius:3px;}
+  [contenteditable]:hover{background:#fff7d6;}
+  [contenteditable]:focus{background:#fff3b0;box-shadow:0 0 0 2px #ffe27a;}
+  .editable-num{min-width:46px;display:inline-block;}
+
+  @media print{
+    .toolbar{display:none !important;}
+    body{background:#fff;}
+    .sheet{margin:0;box-shadow:none;width:auto;min-height:auto;padding:14mm 14mm;}
+    [contenteditable]:hover,[contenteditable]:focus{background:transparent;box-shadow:none;}
+    .del-btn{display:none !important;}
+  }
+
+  .del-btn{border:none;background:none;color:#c0392b;cursor:pointer;font-size:14px;line-height:1;padding:0 4px;}
+  .del-btn:hover{color:#e74c3c;}
+
+  /* botones de acción */
+  .toolbar button.wa{background:#25D366;border-color:#25D366;color:#063d20;}
+  .toolbar button.wa:hover{background:#43e07f;}
+  .toolbar button.mail{background:#2e6db4;border-color:#2e6db4;color:#fff;}
+  .toolbar button.mail:hover{background:#3f81cc;}
+  .toolbar .sep{width:1px;height:24px;background:rgba(255,255,255,.25);margin:0 4px;}
+
+  /* al exportar a PDF / imprimir ocultamos la papelera */
+  .exporting .del-btn{display:none !important;}
+
+  /* aviso flotante */
+  .toast{
+    position:fixed;left:50%;bottom:26px;transform:translateX(-50%);
+    background:var(--navy);color:#fff;padding:12px 20px;border-radius:10px;
+    font-size:13.5px;font-weight:500;box-shadow:0 8px 28px rgba(0,0,0,.28);
+    z-index:9999;max-width:90vw;text-align:center;opacity:0;pointer-events:none;
+    transition:opacity .25s ease;
+  }
+  .toast.show{opacity:1;}
+</style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+</head>
+<body>
+
+<div class="toolbar">
+  <h1>Plantilla de factura · Elena Espigares Martínez</h1>
+  <span style="font-size:12px;color:rgba(255,255,255,.8)">IVA</span>
+  <input id="ivaPct" type="number" value="21" min="0" step="0.5" style="width:58px;padding:6px;border-radius:6px;border:1px solid rgba(255,255,255,.35);background:rgba(255,255,255,.1);color:#fff;font:inherit;text-align:center;">
+  <span style="font-size:12px;color:rgba(255,255,255,.8)">IRPF</span>
+  <input id="irpfPct" type="number" value="15" min="0" step="0.5" style="width:58px;padding:6px;border-radius:6px;border:1px solid rgba(255,255,255,.35);background:rgba(255,255,255,.1);color:#fff;font:inherit;text-align:center;">
+  <button onclick="addRow()">+ Línea</button>
+  <button onclick="toggleIRPF()" id="irpfToggle">Quitar IRPF</button>
+  <button onclick="nuevaFactura()" title="Vacía cliente y conceptos; mantiene tus datos">Nueva factura</button>
+  <span class="sep"></span>
+  <button class="primary" onclick="imprimir()">🖨️ Imprimir / PDF</button>
+  <button class="wa" onclick="enviar('whatsapp')">WhatsApp</button>
+  <button class="mail" onclick="enviar('email')">Email</button>
+  <div class="hint">Toca cualquier texto para editarlo. Tus datos se guardan solos en este dispositivo. Imprimir genera el PDF; WhatsApp / Email lo adjuntan automáticamente (en el móvil) o lo descargan para adjuntar (en el ordenador).</div>
+</div>
+
+<div class="sheet">
+
+  <!-- CABECERA -->
+  <div class="head">
+    <div class="brand">
+      <!-- ► Para usar tu logo real: borra el <svg>…</svg> y pon  <img src="logo.png" class="mark"> -->
+      <svg class="mark" viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg" fill="none">
+        <!-- cabezas -->
+        <circle cx="48" cy="20" r="4.5" fill="#14335f"/>
+        <circle cx="72" cy="20" r="4.5" fill="#14335f"/>
+        <!-- pétalos exteriores navy -->
+        <path d="M60 38 C40 40 26 54 24 74 C44 74 56 62 60 44 Z" stroke="#1f4a82" stroke-width="3.4" stroke-linejoin="round"/>
+        <path d="M60 38 C80 40 94 54 96 74 C76 74 64 62 60 44 Z" stroke="#1f4a82" stroke-width="3.4" stroke-linejoin="round"/>
+        <!-- pétalo claro central -->
+        <path d="M60 30 C50 46 50 64 60 80 C70 64 70 46 60 30 Z" stroke="#57a8df" stroke-width="3.4" stroke-linejoin="round"/>
+        <!-- pétalos interiores navy -->
+        <path d="M60 42 C53 56 54 70 60 82 C66 70 67 56 60 42 Z" stroke="#14335f" stroke-width="3.4" stroke-linejoin="round"/>
+        <!-- hojas inferiores -->
+        <path d="M60 86 C44 80 26 84 16 100 C34 110 52 104 60 90 Z" fill="#57a8df" stroke="#14335f" stroke-width="3.6" stroke-linejoin="round"/>
+        <path d="M60 86 C76 80 94 84 104 100 C86 110 68 104 60 90 Z" fill="#57a8df" stroke="#14335f" stroke-width="3.6" stroke-linejoin="round"/>
+      </svg>
+      <div class="name">
+        <div class="l1">ELENA ESPIGARES</div>
+        <div class="l1">MARTÍNEZ</div>
+        <div class="l2">Asesoría Fiscal y Contable</div>
+      </div>
+    </div>
+
+    <div class="doc-meta">
+      <div class="title">Factura</div>
+      <table id="metaTable">
+        <tr><td class="k">Nº Factura</td><td class="v" contenteditable>2026/001</td></tr>
+        <tr><td class="k">Fecha</td><td class="v" contenteditable>13/06/2026</td></tr>
+        <tr><td class="k">Vencimiento</td><td class="v" contenteditable>13/07/2026</td></tr>
+      </table>
+    </div>
+  </div>
+
+  <div class="rule"></div>
+
+  <!-- EMISOR / CLIENTE -->
+  <div class="parties">
+    <div class="party emitter">
+      <h3>Emisor</h3>
+      <div class="body" id="emisorBody">
+        <div class="nm" contenteditable>Elena Espigares Martínez</div>
+        <div class="row" contenteditable>NIF: 00000000-X</div>
+        <div class="row" contenteditable>Calle Ejemplo, 00 · 18000 Granada</div>
+        <div class="row" contenteditable>Tel. 600 00 00 00</div>
+        <div class="row" contenteditable>info@correo.es</div>
+      </div>
+    </div>
+    <div class="party client">
+      <h3>Cliente</h3>
+      <div class="body" id="clienteBody">
+        <div class="nm" contenteditable>Nombre del cliente / Razón social</div>
+        <div class="row" contenteditable>NIF/CIF: 00000000-X</div>
+        <div class="row" contenteditable>Dirección fiscal del cliente</div>
+        <div class="row" contenteditable>00000 Población (Provincia)</div>
+        <div class="row" contenteditable>&nbsp;</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- CONCEPTOS -->
+  <div class="items-box">
+    <table class="items">
+      <thead>
+        <tr>
+          <th class="concept">Concepto</th>
+          <th style="width:70px">Uds.</th>
+          <th style="width:110px">Precio (€)</th>
+          <th style="width:120px">Importe (€)</th>
+          <th style="width:28px"></th>
+        </tr>
+      </thead>
+      <tbody id="rows">
+        <!-- filas generadas por JS -->
+      </tbody>
+    </table>
+  </div>
+
+  <!-- TOTALES + PAGO -->
+  <div class="foot">
+    <div class="pay">
+      <h4>Forma de pago</h4>
+      <div class="box" id="payBox">
+        <div contenteditable>Transferencia bancaria</div>
+        <div>IBAN: <span class="iban" contenteditable>ES00 0000 0000 00 0000000000</span></div>
+        <div contenteditable style="margin-top:6px;color:var(--muted)">Pago a 30 días desde la fecha de emisión.</div>
+      </div>
+    </div>
+
+    <div class="totals">
+      <table>
+        <tr><td class="head-cell" colspan="2">Resumen</td></tr>
+        <tr><td class="k">Base imponible</td><td class="v num" id="base">0,00 €</td></tr>
+        <tr class="sub"><td class="k">IVA (<span id="ivaLbl">21</span>%)</td><td class="v num" id="iva">0,00 €</td></tr>
+        <tr class="sub irpf-row"><td class="k">Retención IRPF (<span id="irpfLbl">15</span>%)</td><td class="v num" id="irpf">0,00 €</td></tr>
+        <tr class="grand"><td class="k">TOTAL</td><td class="v num" id="total">0,00 €</td></tr>
+      </table>
+    </div>
+  </div>
+
+  <!-- PIE LEGAL -->
+  <div class="legal">
+    <b>Elena Espigares Martínez</b> · Asesoría Fiscal y Contable · NIF 00000000-X<br>
+    Factura emitida conforme al RD 1619/2012. Conserve este documento como justificante. En cumplimiento del RGPD, sus datos se tratan con la única finalidad de la relación profesional y facturación.
+  </div>
+
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+  let irpfEnabled = true;
+  const LS_KEY = 'factura_elena_v1';
+  const $ = id => document.getElementById(id);
+
+  const fmt = n => (n||0).toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2}) + ' €';
+  const parseNum = s => {
+    if(s==null) return 0;
+    s = String(s).replace(/[^\d,.\-]/g,'').replace(/\.(?=\d{3}(\D|$))/g,'').replace(',', '.');
+    const v = parseFloat(s); return isNaN(v)?0:v;
+  };
+
+  /* ---------- líneas de concepto ---------- */
+  function rowHTML(concept='Concepto', qty='1', price='0,00'){
+    return `<tr>
+      <td class="concept" contenteditable oninput="calc()">${concept}</td>
+      <td class="num" contenteditable oninput="calc()">${qty}</td>
+      <td class="num" contenteditable oninput="calc()">${price}</td>
+      <td class="num lineTotal">0,00 €</td>
+      <td><button class="del-btn" title="Eliminar línea" onclick="this.closest('tr').remove();calc()">×</button></td>
+    </tr>`;
+  }
+  function addRow(){
+    $('rows').insertAdjacentHTML('beforeend', rowHTML());
+    calc();
+  }
+
+  function toggleIRPF(){
+    irpfEnabled = !irpfEnabled;
+    document.querySelector('.irpf-row').style.display = irpfEnabled ? '' : 'none';
+    $('irpfToggle').textContent = irpfEnabled ? 'Quitar IRPF' : 'Añadir IRPF';
+    calc();
+  }
+
+  /* ---------- cálculo ---------- */
+  function calc(){
+    const ivaPct = parseFloat($('ivaPct').value)||0;
+    const irpfPct = parseFloat($('irpfPct').value)||0;
+    $('ivaLbl').textContent = ivaPct;
+    $('irpfLbl').textContent = irpfPct;
+
+    let base = 0;
+    document.querySelectorAll('#rows tr').forEach(tr=>{
+      const tds = tr.querySelectorAll('td');
+      const qty = parseNum(tds[1].textContent);
+      const price = parseNum(tds[2].textContent);
+      const lt = qty*price;
+      tr.querySelector('.lineTotal').textContent = fmt(lt);
+      base += lt;
+    });
+
+    const iva = base * ivaPct/100;
+    const irpf = irpfEnabled ? base * irpfPct/100 : 0;
+    $('base').textContent = fmt(base);
+    $('iva').textContent  = fmt(iva);
+    $('irpf').textContent = '− ' + fmt(irpf);
+    $('total').textContent = fmt(base + iva - irpf);
+    saveState();
+  }
+
+  /* ---------- memoria (localStorage) ---------- */
+  function saveState(){
+    try{
+      localStorage.setItem(LS_KEY, JSON.stringify({
+        meta:    $('metaTable').innerHTML,
+        emisor:  $('emisorBody').innerHTML,
+        cliente: $('clienteBody').innerHTML,
+        rows:    $('rows').innerHTML,
+        pay:     $('payBox').innerHTML,
+        iva:     $('ivaPct').value,
+        irpf:    $('irpfPct').value,
+        irpfEnabled: irpfEnabled
+      }));
+    }catch(e){}
+  }
+  function loadState(){
+    try{
+      const raw = localStorage.getItem(LS_KEY); if(!raw) return false;
+      const st = JSON.parse(raw);
+      $('metaTable').innerHTML  = st.meta;
+      $('emisorBody').innerHTML = st.emisor;
+      $('clienteBody').innerHTML= st.cliente;
+      $('rows').innerHTML       = st.rows;
+      $('payBox').innerHTML     = st.pay;
+      $('ivaPct').value  = st.iva;
+      $('irpfPct').value = st.irpf;
+      irpfEnabled = st.irpfEnabled;
+      document.querySelector('.irpf-row').style.display = irpfEnabled ? '' : 'none';
+      $('irpfToggle').textContent = irpfEnabled ? 'Quitar IRPF' : 'Añadir IRPF';
+      return true;
+    }catch(e){ return false; }
+  }
+
+  /* ---------- nueva factura (mantiene tus datos, vacía cliente y conceptos) ---------- */
+  function nuevaFactura(){
+    if(!confirm('¿Empezar una factura nueva? Se mantienen tus datos de emisor, IBAN, IVA e IRPF; se vacían el cliente y los conceptos.')) return;
+    $('clienteBody').innerHTML =
+      '<div class="nm" contenteditable>Nombre del cliente / Razón social</div>'+
+      '<div class="row" contenteditable>NIF/CIF: </div>'+
+      '<div class="row" contenteditable>Dirección fiscal del cliente</div>'+
+      '<div class="row" contenteditable>00000 Población (Provincia)</div>'+
+      '<div class="row" contenteditable>&nbsp;</div>';
+    $('rows').innerHTML = rowHTML();
+    calc();
+    toast('Factura nueva lista. Acuérdate de cambiar el nº de factura.');
+  }
+
+  /* ---------- aviso flotante ---------- */
+  let toastT;
+  function toast(msg, ms=3800){
+    const t = $('toast'); t.textContent = msg; t.classList.add('show');
+    clearTimeout(toastT); toastT = setTimeout(()=>t.classList.remove('show'), ms);
+  }
+
+  /* ---------- datos para nombres de archivo y mensajes ---------- */
+  function datos(){
+    const num    = (document.querySelector('#metaTable .v')||{}).textContent || '';
+    const cliente= (document.querySelector('#clienteBody .nm')||{}).textContent || '';
+    const emisor = (document.querySelector('#emisorBody .nm')||{}).textContent || '';
+    const total  = $('total').textContent || '';
+    return {num:num.trim(), cliente:cliente.trim(), emisor:emisor.trim(), total:total.trim()};
+  }
+
+  /* ---------- imprimir / guardar PDF ---------- */
+  function imprimir(){
+    document.body.classList.add('exporting');
+    window.print();
+    setTimeout(()=>document.body.classList.remove('exporting'), 800);
+  }
+
+  /* ---------- generar el PDF como archivo ---------- */
+  async function generarPDF(){
+    const d = datos();
+    const safe = (d.num || 'factura').replace(/[^\w\-]+/g,'_');
+    const filename = 'Factura-' + safe + '.pdf';
+    document.body.classList.add('exporting');
+    const opt = {
+      margin: 0,
+      filename,
+      image: {type:'jpeg', quality:0.98},
+      html2canvas: {scale:2, useCORS:true, backgroundColor:'#ffffff'},
+      jsPDF: {unit:'mm', format:'a4', orientation:'portrait'}
+    };
+    try{
+      const blob = await html2pdf().set(opt).from(document.querySelector('.sheet')).outputPdf('blob');
+      return {blob, filename, d};
+    } finally {
+      document.body.classList.remove('exporting');
+    }
+  }
+  function descargar(blob, filename){
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = filename;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(()=>URL.revokeObjectURL(url), 5000);
+  }
+
+  /* ---------- enviar por WhatsApp / Email ---------- */
+  async function enviar(canal){
+    if(typeof html2pdf === 'undefined'){
+      toast('Necesitas conexión a internet la primera vez para preparar el PDF.');
+      return;
+    }
+    toast('Generando el PDF…', 6000);
+    let r;
+    try{ r = await generarPDF(); }
+    catch(e){ toast('No se pudo generar el PDF.'); return; }
+
+    const {blob, filename, d} = r;
+    const file = new File([blob], filename, {type:'application/pdf'});
+    const texto = `Hola, le adjunto la factura nº ${d.num} por un importe total de ${d.total}. Un saludo, ${d.emisor}.`;
+
+    // MÓVIL: comparte el PDF ya adjunto al menú nativo (WhatsApp, correo, etc.)
+    if(navigator.canShare && navigator.canShare({files:[file]})){
+      try{
+        await navigator.share({files:[file], title:'Factura ' + d.num, text:texto});
+        return;
+      }catch(e){ if(e && e.name === 'AbortError') return; /* si no, sigue al plan B */ }
+    }
+
+    // ORDENADOR: descarga el PDF y abre el canal con el mensaje escrito
+    descargar(blob, filename);
+    if(canal === 'whatsapp'){
+      window.open('https://wa.me/?text=' + encodeURIComponent(texto), '_blank');
+      toast('PDF descargado. Adjúntalo en el WhatsApp que se ha abierto (arrástralo al chat).', 6000);
+    } else {
+      const asunto = 'Factura nº ' + d.num + ' — ' + d.emisor;
+      window.location.href = 'mailto:?subject=' + encodeURIComponent(asunto) + '&body=' + encodeURIComponent(texto);
+      toast('PDF descargado. Adjúntalo en el correo que se ha abierto.', 6000);
+    }
+  }
+
+  /* ---------- arranque ---------- */
+  $('ivaPct').addEventListener('input', calc);
+  $('irpfPct').addEventListener('input', calc);
+  document.querySelector('.sheet').addEventListener('input', saveState);
+
+  if(!loadState()){
+    $('rows').insertAdjacentHTML('beforeend', rowHTML('Asesoría fiscal y contable mensual', '1', '120,00'));
+    $('rows').insertAdjacentHTML('beforeend', rowHTML('Presentación trimestral de impuestos (modelos 303/130)', '1', '60,00'));
+  }
+  calc();
+</script>
+
+</body>
+</html>
