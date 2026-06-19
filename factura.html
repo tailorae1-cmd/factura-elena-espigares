@@ -197,7 +197,7 @@
 
   @page{ size:A4; margin:0; }
   @media print{
-    .toolbar, .ai-panel{display:none !important;}
+    .toolbar, .ai-panel, .arch-drawer, .arch-backdrop{display:none !important;}
     body{background:#fff;}
     /* la hoja rellena el folio (igual que en pantalla), no se encoge al contenido */
     .sheet{margin:0;box-shadow:none;width:auto;min-height:296mm;padding:14mm 14mm;}
@@ -229,6 +229,38 @@
     transition:opacity .25s ease;
   }
   .toast.show{opacity:1;}
+
+  /* archivo de facturas (cajón izquierdo) */
+  .arch-backdrop{position:fixed;inset:0;background:rgba(12,28,51,.38);opacity:0;visibility:hidden;
+    transition:opacity .2s;z-index:40;}
+  .arch-backdrop.open{opacity:1;visibility:visible;}
+  .arch-drawer{position:fixed;top:0;left:0;height:100%;width:300px;max-width:86vw;background:#fff;
+    box-shadow:4px 0 24px rgba(20,51,95,.22);transform:translateX(-100%);transition:transform .25s ease;
+    z-index:50;display:flex;flex-direction:column;}
+  .arch-drawer.open{transform:translateX(0);}
+  .arch-head{display:flex;align-items:center;justify-content:space-between;background:var(--navy);color:#fff;
+    padding:14px 16px;font-weight:700;font-size:14px;}
+  .arch-close{border:none;background:none;color:#fff;font-size:22px;line-height:1;cursor:pointer;}
+  .arch-list{flex:1;overflow-y:auto;padding:8px;}
+  .arch-empty{color:var(--muted);font-size:12.5px;line-height:1.6;padding:18px 14px;text-align:center;}
+  .arch-group{border-bottom:1px solid var(--line);}
+  .arch-cli{width:100%;display:flex;align-items:center;gap:8px;background:none;border:none;cursor:pointer;
+    padding:11px 8px;font:inherit;font-size:13px;font-weight:600;color:var(--navy);text-align:left;}
+  .arch-cli:hover{background:#f3f8fc;}
+  .arch-caret{transition:transform .15s ease;font-size:11px;color:var(--blue);}
+  .arch-group.open .arch-caret{transform:rotate(90deg);}
+  .arch-name{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .arch-count{background:var(--blue-light);color:#0c2440;border-radius:10px;font-size:11px;font-weight:700;padding:1px 8px;}
+  .arch-items{display:none;padding:0 4px 8px 24px;}
+  .arch-group.open .arch-items{display:block;}
+  .arch-item{display:flex;align-items:center;gap:6px;}
+  .arch-load{flex:1;display:flex;justify-content:space-between;gap:10px;background:#f6f9fc;border:1px solid var(--line);
+    border-radius:7px;padding:7px 10px;margin:3px 0;cursor:pointer;font:inherit;}
+  .arch-load:hover{background:#e9f3fc;border-color:var(--blue);}
+  .arch-num{font-weight:700;color:var(--navy);font-size:12.5px;}
+  .arch-fecha{color:var(--muted);font-size:11.5px;font-variant-numeric:tabular-nums;}
+  .arch-del{border:none;background:none;color:#c0392b;font-size:16px;line-height:1;cursor:pointer;padding:0 4px;}
+  .arch-del:hover{color:#e74c3c;}
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 </head>
@@ -243,12 +275,24 @@
   <button onclick="addRow()">+ Línea</button>
   <button onclick="toggleRet()" id="retToggle">Quitar retención</button>
   <button onclick="nuevaFactura()" title="Vacía cliente y conceptos; mantiene tus datos">Nueva factura</button>
+  <button onclick="archivarActual(false)" title="Guarda esta factura en el archivo">💾 Guardar</button>
+  <button onclick="toggleArchivo()" title="Ver las facturas guardadas">📁 Guardadas</button>
   <span class="sep"></span>
   <button class="primary" onclick="imprimir()">🖨️ Imprimir / PDF</button>
   <button class="wa" onclick="enviar('whatsapp')">WhatsApp</button>
   <button class="mail" onclick="enviar('email')">Email</button>
   <div class="hint">Toca cualquier texto (subrayado) para editarlo. Tus datos se guardan solos en este dispositivo. O usa el asistente de abajo para rellenarla escribiendo o subiendo una foto.</div>
 </div>
+
+<!-- ARCHIVO DE FACTURAS (cajón izquierdo) -->
+<div class="arch-backdrop" id="archBackdrop" onclick="cerrarArchivo()"></div>
+<aside class="arch-drawer" id="archDrawer" aria-hidden="true">
+  <div class="arch-head">
+    <span>📁 Facturas guardadas</span>
+    <button class="arch-close" onclick="cerrarArchivo()" title="Cerrar">×</button>
+  </div>
+  <div class="arch-list" id="archivoList"></div>
+</aside>
 
 <!-- ASISTENTE IA -->
 <div class="ai-panel">
@@ -421,19 +465,99 @@
   }
 
   /* ---------- memoria (localStorage) ---------- */
-  function saveState(){
-    try{
-      localStorage.setItem(LS_KEY, JSON.stringify({
-        meta:    $('metaTable').innerHTML,
-        emisor:  $('emisorBody').innerHTML,
-        cliente: $('clienteBody').innerHTML,
-        rows:    $('rows').innerHTML,
-        pay:     $('payBox').innerHTML,
-        iva:     $('ivaPct').value,
-        ret:     $('retPct').value,
-        retEnabled: retEnabled
-      }));
-    }catch(e){}
+  function snapshotActual(){
+    return {
+      meta:    $('metaTable').innerHTML,
+      emisor:  $('emisorBody').innerHTML,
+      cliente: $('clienteBody').innerHTML,
+      rows:    $('rows').innerHTML,
+      pay:     $('payBox').innerHTML,
+      iva:     $('ivaPct').value,
+      ret:     $('retPct').value,
+      retEnabled: retEnabled
+    };
+  }
+  function saveState(){ try{ localStorage.setItem(LS_KEY, JSON.stringify(snapshotActual())); }catch(e){} }
+
+  /* ---------- archivo de facturas guardadas ---------- */
+  const ARCH_KEY = 'factura_elena_archivo';
+  function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+  function getArchivo(){ try{ return JSON.parse(localStorage.getItem(ARCH_KEY)||'[]'); }catch(_){ return []; } }
+  function setArchivo(a){ try{ localStorage.setItem(ARCH_KEY, JSON.stringify(a)); }catch(_){} }
+  function parseFecha(s){ const m=String(s||'').match(/(\d{1,2})\/(\d{1,2})\/(\d{2,4})/); if(!m) return 0; let y=+m[3]; if(y<100) y+=2000; return new Date(y, +m[2]-1, +m[1]).getTime()||0; }
+
+  function archivarActual(silent){
+    const d = datos();
+    const num = (d.num||'').trim();
+    const cli = (d.cliente||'').trim();
+    if(!num){ if(!silent) toast('Ponle un número a la factura antes de guardarla.'); return false; }
+    if(silent && (!cli || cli === 'Nombre del cliente / Razón social')) return false; // no archivar la plantilla vacía
+    const fecha = ((document.querySelectorAll('#metaTable .v')[1]||{}).textContent||'').trim();
+    const arr = getArchivo();
+    const rec = { numero:num, cliente:(cli||'(sin cliente)'), fecha, total:(d.total||''), snap:snapshotActual() };
+    const i = arr.findIndex(r=>r.numero===num);
+    if(i>=0) arr[i]=rec; else arr.push(rec);  // mismo número = actualiza
+    setArchivo(arr);
+    renderArchivo();
+    if(!silent) toast('Factura ' + num + ' guardada en el archivo.');
+    return true;
+  }
+
+  function renderArchivo(){
+    const cont = $('archivoList'); if(!cont) return;
+    const arr = getArchivo();
+    if(!arr.length){ cont.innerHTML = '<div class="arch-empty">Aún no hay facturas guardadas.<br>Pulsa «💾 Guardar», o imprime/envía una, y aparecerá aquí.</div>'; return; }
+    const groups = {};
+    arr.forEach(r => { (groups[r.cliente] = groups[r.cliente] || []).push(r); });
+    const names = Object.keys(groups).sort((a,b)=>a.localeCompare(b,'es',{sensitivity:'base'}));
+    cont.innerHTML = names.map(name=>{
+      const items = groups[name].sort((a,b)=>parseFecha(b.fecha)-parseFecha(a.fecha)); // más reciente primero
+      return `<div class="arch-group"><button class="arch-cli" onclick="this.parentNode.classList.toggle('open')">`+
+        `<span class="arch-caret">▸</span><span class="arch-name">${esc(name)}</span><span class="arch-count">${items.length}</span></button>`+
+        `<div class="arch-items">` + items.map(r=>
+          `<div class="arch-item"><button class="arch-load" data-load="${esc(r.numero)}" title="Editar esta factura">`+
+          `<span class="arch-num">${esc(r.numero)}</span><span class="arch-fecha">${esc(r.fecha)}</span></button>`+
+          `<button class="arch-del" data-del="${esc(r.numero)}" title="Quitar del archivo">×</button></div>`).join('') +
+        `</div></div>`;
+    }).join('');
+  }
+
+  function cargarFactura(num){
+    const r = getArchivo().find(x=>x.numero===num);
+    if(!r){ toast('No se encontró la factura.'); return; }
+    const s = r.snap;
+    $('metaTable').innerHTML  = s.meta;
+    if(s.emisor) $('emisorBody').innerHTML = s.emisor;
+    $('clienteBody').innerHTML = s.cliente;
+    $('rows').innerHTML       = s.rows;
+    $('payBox').innerHTML     = s.pay;
+    if(s.iva!=null) $('ivaPct').value = s.iva;
+    if(s.ret!=null) $('retPct').value = s.ret;
+    if(typeof s.retEnabled === 'boolean') retEnabled = s.retEnabled;
+    document.querySelector('.ret-row').style.display = retEnabled ? '' : 'none';
+    $('retToggle').textContent = retEnabled ? 'Quitar retención' : 'Añadir retención';
+    calc();
+    cerrarArchivo();
+    toast('Factura ' + num + ' cargada. Edítala y pulsa 💾 Guardar para actualizarla.');
+  }
+
+  function borrarFactura(num){
+    if(!confirm('¿Quitar la factura ' + num + ' de esta lista? (Solo la borra del archivo de la app.)')) return;
+    setArchivo(getArchivo().filter(x=>x.numero!==num));
+    renderArchivo();
+    toast('Factura ' + num + ' eliminada del archivo.');
+  }
+
+  function toggleArchivo(){
+    const dr = $('archDrawer'); const open = dr.classList.toggle('open');
+    $('archBackdrop').classList.toggle('open', open);
+    dr.setAttribute('aria-hidden', open ? 'false' : 'true');
+    if(open) renderArchivo();
+  }
+  function cerrarArchivo(){
+    $('archDrawer').classList.remove('open');
+    $('archBackdrop').classList.remove('open');
+    $('archDrawer').setAttribute('aria-hidden','true');
   }
   function loadState(){
     try{
@@ -469,6 +593,7 @@
 
   function nuevaFactura(){
     if(!confirm('¿Empezar una factura nueva? Se pone el número siguiente y la fecha de hoy; se mantienen tus datos (emisor, IBAN, IVA, retención) y se vacían el cliente y los conceptos.')) return;
+    archivarActual(true);   // guarda la factura actual en el archivo antes de empezar otra
     const metas = document.querySelectorAll('#metaTable .v');
     if(metas[0]) metas[0].textContent = nextNumero(metas[0].textContent);
     if(metas[1]) metas[1].textContent = hoyDDMMYYYY(0);
@@ -502,6 +627,7 @@
 
   /* ---------- imprimir / guardar PDF ---------- */
   function imprimir(){
+    archivarActual(true);
     document.body.classList.add('exporting');
     window.print();
     setTimeout(()=>document.body.classList.remove('exporting'), 800);
@@ -552,6 +678,7 @@
     const d = datos();
     const texto = `Hola, le adjunto la factura nº ${d.num} por un importe total de ${d.total}. Un saludo, ${d.emisor}.`;
     const compartir = puedeCompartirArchivos();
+    archivarActual(true);   // al enviarla, queda guardada en el archivo
 
     // En ORDENADOR abrimos WhatsApp en el mismo clic, así el navegador no lo bloquea
     let waWin = null;
@@ -721,6 +848,13 @@
     $('aiPhotoName').textContent = this.files[0] ? this.files[0].name : '';
   });
   document.querySelector('.sheet').addEventListener('input', saveState);
+  $('archivoList').addEventListener('click', function(e){
+    const del = e.target.closest('[data-del]');
+    if(del){ borrarFactura(del.getAttribute('data-del')); return; }
+    const load = e.target.closest('[data-load]');
+    if(load){ cargarFactura(load.getAttribute('data-load')); return; }
+  });
+  renderArchivo();
 
   if(!loadState()){
     $('rows').insertAdjacentHTML('beforeend', rowHTML('Asesoría fiscal y contable mensual', '1', '120,00'));
