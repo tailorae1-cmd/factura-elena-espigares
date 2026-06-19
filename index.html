@@ -62,23 +62,27 @@
 
   /* ---------- Cabecera ---------- */
   .head{display:flex;justify-content:space-between;align-items:flex-start;gap:24px;}
-  .brand{display:flex;flex-direction:column;align-items:flex-start;gap:12px;}
+  .brand{display:flex;align-items:center;}
   .brand-logo{height:84px;width:auto;max-width:340px;display:block;}
   .colegiada{display:flex;flex-direction:column;gap:3px;}
   .colegiada .cap{font-size:8.5px;font-weight:700;letter-spacing:.13em;text-transform:uppercase;color:var(--muted);}
   .colegiada img{height:34px;width:auto;display:block;}
+  .footer-row{margin-top:22px;padding-top:14px;border-top:1px solid var(--line);
+    display:flex;align-items:center;justify-content:space-between;gap:24px;}
+  .footer-row .colegiada{flex:none;}
+  .footer-row .legal{margin:0;padding:0;border:none;text-align:right;flex:1;}
   .brand .mark{width:78px;height:78px;flex:0 0 78px;}
   .brand .name{line-height:1.18;}
   .brand .name .l1{font-size:22px;font-weight:700;letter-spacing:3px;color:var(--navy);}
   .brand .name .l2{font-size:9.5px;font-weight:600;letter-spacing:3px;color:var(--blue);margin-top:3px;text-transform:uppercase;}
 
-  .doc-meta{text-align:right;min-width:230px;}
+  .doc-meta{text-align:left;min-width:230px;}
   .doc-meta .title{
     font-size:30px;font-weight:300;letter-spacing:8px;color:var(--navy);
     text-transform:uppercase;
   }
-  .doc-meta table{border-collapse:collapse;margin-left:auto;margin-top:10px;font-size:12px;}
-  .doc-meta td{padding:3px 0 3px 14px;text-align:right;}
+  .doc-meta table{border-collapse:collapse;margin-right:auto;margin-top:10px;font-size:12px;}
+  .doc-meta td{padding:3px 14px 3px 0;text-align:left;}
   .doc-meta td.k{color:var(--muted);font-weight:600;text-transform:uppercase;font-size:10px;letter-spacing:.5px;}
   .doc-meta td.v{font-weight:600;color:var(--ink);min-width:120px;}
 
@@ -320,10 +324,6 @@
   <div class="head">
     <div class="brand">
       <img class="brand-logo" src="logo.png" alt="Elena Espigares Martínez · Asesoría Fiscal y Contable">
-      <div class="colegiada">
-        <span class="cap">Economista colegiada</span>
-        <img src="colegio.png" width="150" height="35" alt="Colegio Profesional de Economistas de Granada">
-      </div>
     </div>
 
     <div class="issuer" id="emisorBody">
@@ -338,6 +338,15 @@
 
   <!-- CLIENTE + DATOS DE LA FACTURA -->
   <div class="parties">
+    <div class="doc-meta">
+      <div class="title">Factura</div>
+      <table id="metaTable">
+        <tr><td class="k">Nº Factura</td><td class="v" contenteditable>2026/001</td></tr>
+        <tr><td class="k">Fecha</td><td class="v" contenteditable>13/06/2026</td></tr>
+        <tr><td class="k">Vencimiento</td><td class="v" contenteditable>13/07/2026</td></tr>
+      </table>
+    </div>
+
     <div class="party client">
       <h3>Cliente</h3>
       <div class="body" id="clienteBody">
@@ -347,15 +356,6 @@
         <div class="row" contenteditable>00000 Población (Provincia)</div>
         <div class="row" contenteditable>&nbsp;</div>
       </div>
-    </div>
-
-    <div class="doc-meta">
-      <div class="title">Factura</div>
-      <table id="metaTable">
-        <tr><td class="k">Nº Factura</td><td class="v" contenteditable>2026/001</td></tr>
-        <tr><td class="k">Fecha</td><td class="v" contenteditable>13/06/2026</td></tr>
-        <tr><td class="k">Vencimiento</td><td class="v" contenteditable>13/07/2026</td></tr>
-      </table>
     </div>
   </div>
 
@@ -399,10 +399,16 @@
     </div>
   </div>
 
-  <!-- PIE LEGAL -->
-  <div class="legal">
-    <b>Elena Espigares Martínez</b> · Asesoría Fiscal y Contable · NIF 44276211S<br>
-    Factura emitida conforme al RD 1619/2012. Conserve este documento como justificante. En cumplimiento del RGPD, sus datos se tratan con la única finalidad de la relación profesional y facturación.
+  <!-- PIE: sello colegiada (izquierda) + legal -->
+  <div class="footer-row">
+    <div class="colegiada">
+      <span class="cap">Economista colegiada</span>
+      <img src="colegio.png" width="150" height="35" alt="Colegio Profesional de Economistas de Granada">
+    </div>
+    <div class="legal">
+      <b>Elena Espigares Martínez</b> · Asesoría Fiscal y Contable · NIF 44276211S<br>
+      Factura emitida conforme al RD 1619/2012. Conserve este documento como justificante. En cumplimiento del RGPD, sus datos se tratan con la única finalidad de la relación profesional y facturación.
+    </div>
   </div>
 
 </div>
