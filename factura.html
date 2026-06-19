@@ -62,8 +62,11 @@
 
   /* ---------- Cabecera ---------- */
   .head{display:flex;justify-content:space-between;align-items:flex-start;gap:24px;}
-  .brand{display:flex;align-items:center;gap:16px;}
+  .brand{display:flex;flex-direction:column;align-items:flex-start;gap:12px;}
   .brand-logo{height:84px;width:auto;max-width:340px;display:block;}
+  .colegiada{display:flex;flex-direction:column;gap:3px;}
+  .colegiada .cap{font-size:8.5px;font-weight:700;letter-spacing:.13em;text-transform:uppercase;color:var(--muted);}
+  .colegiada img{height:34px;width:auto;display:block;}
   .brand .mark{width:78px;height:78px;flex:0 0 78px;}
   .brand .name{line-height:1.18;}
   .brand .name .l1{font-size:22px;font-weight:700;letter-spacing:3px;color:var(--navy);}
@@ -317,6 +320,10 @@
   <div class="head">
     <div class="brand">
       <img class="brand-logo" src="logo.png" alt="Elena Espigares Martínez · Asesoría Fiscal y Contable">
+      <div class="colegiada">
+        <span class="cap">Economista colegiada</span>
+        <img src="colegio.png" width="150" height="35" alt="Colegio Profesional de Economistas de Granada">
+      </div>
     </div>
 
     <div class="issuer" id="emisorBody">
