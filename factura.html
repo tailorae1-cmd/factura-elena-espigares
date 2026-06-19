@@ -195,10 +195,12 @@
     body:not(.exporting) table.items tbody td{padding:10px 7px;font-size:11.5px;}
   }
 
+  @page{ size:A4; margin:0; }
   @media print{
     .toolbar, .ai-panel{display:none !important;}
     body{background:#fff;}
-    .sheet{margin:0;box-shadow:none;width:auto;min-height:auto;padding:14mm 14mm;}
+    /* la hoja rellena el folio (igual que en pantalla), no se encoge al contenido */
+    .sheet{margin:0;box-shadow:none;width:auto;min-height:296mm;padding:14mm 14mm;}
     [contenteditable]:hover,[contenteditable]:focus{background:transparent;box-shadow:none;}
     .sheet [contenteditable]{border-bottom:none !important;}
     .del-btn{display:none !important;}
