@@ -62,11 +62,12 @@
 
   /* ---------- Cabecera ---------- */
   .head{display:flex;justify-content:space-between;align-items:flex-start;gap:24px;}
-  .brand{display:flex;align-items:center;}
+  .brand{display:flex;flex-direction:column;align-items:flex-start;gap:11px;}
   .brand-logo{height:84px;width:auto;max-width:340px;display:block;}
   .colegiada{display:flex;flex-direction:column;gap:3px;}
   .colegiada .cap{font-size:8.5px;font-weight:700;letter-spacing:.13em;text-transform:uppercase;color:var(--muted);}
-  .colegiada img{height:26px;width:auto;display:block;}
+  .colegiada img{height:30px;width:auto;display:block;}
+  .legal .leg-mid{font-weight:700;color:var(--navy);font-size:11px;margin-bottom:3px;}
   .footer-row{margin-top:22px;padding-top:14px;border-top:1px solid var(--line);
     display:flex;align-items:center;justify-content:space-between;gap:24px;}
   .footer-row .colegiada{flex:none;}
@@ -328,6 +329,9 @@
   <div class="head">
     <div class="brand">
       <img class="brand-logo" src="logo.png" alt="Elena Espigares Martínez · Asesoría Fiscal y Contable">
+      <div class="colegiada">
+        <img src="colegio.png" width="150" height="35" alt="Colegio Profesional de Economistas de Granada">
+      </div>
     </div>
 
     <div class="issuer" id="emisorBody">
@@ -405,15 +409,11 @@
     </div>
   </div>
 
-  <!-- PIE: sello colegiada (izquierda) + legal -->
-  <div class="footer-row">
-    <div class="colegiada">
-      <img src="colegio.png" width="150" height="35" alt="Colegio Profesional de Economistas de Granada">
-    </div>
-    <div class="legal">
-      <div class="leg-fine">Factura emitida conforme al RD 1619/2012. Conserve este documento como justificante.</div>
-      <div class="leg-fine">Sus datos se tratan conforme al RGPD con la única finalidad de la relación profesional y la facturación.</div>
-    </div>
+  <!-- PIE legal centrado -->
+  <div class="legal">
+    <div class="leg-mid">Asesoría Fiscal y Contable</div>
+    <div class="leg-fine">Factura emitida conforme al RD 1619/2012. Conserve este documento como justificante.</div>
+    <div class="leg-fine">Sus datos se tratan conforme al RGPD con la única finalidad de la relación profesional y la facturación.</div>
   </div>
 
 </div>
