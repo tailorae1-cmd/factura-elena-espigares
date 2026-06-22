@@ -217,7 +217,7 @@
     .del-btn{display:none !important;}
   }
   .exporting .sheet [contenteditable]{border-bottom:none !important;background:transparent !important;}
-  .exporting .sheet{padding:14mm 14mm !important;min-height:296mm !important;}   /* cabe en 1 página A4 al exportar */
+  .exporting .sheet{margin:0 !important;padding:14mm 14mm !important;min-height:296mm !important;}   /* sin centrar + cabe en 1 página al exportar */
 
   .del-btn{border:none;background:none;color:#c0392b;cursor:pointer;font-size:14px;line-height:1;padding:0 4px;}
   .del-btn:hover{color:#e74c3c;}
@@ -664,7 +664,7 @@
       const worker = html2pdf().set({
         margin: 0, filename,
         image: {type:'jpeg', quality:0.98},
-        html2canvas: {scale:2, useCORS:true, backgroundColor:'#ffffff', windowWidth:1100, onclone:function(dd){ dd.body.classList.add('exporting'); }}
+        html2canvas: {scale:2, useCORS:true, backgroundColor:'#ffffff', windowWidth:794, scrollX:0, scrollY:0, onclone:function(dd){ dd.body.classList.add('exporting'); }}
       }).from(el);
       const canvas = await worker.toCanvas().get('canvas');
       const hmm = 210 * canvas.height / canvas.width + 1;   // página al tamaño REAL del lienzo → 1 sola página
