@@ -62,7 +62,8 @@
 
   /* ---------- Cabecera ---------- */
   .head{display:flex;justify-content:space-between;align-items:flex-start;gap:24px;}
-  .brand{display:flex;flex-direction:column;align-items:flex-start;gap:11px;}
+  .brand{display:flex;align-items:center;}
+  .legal .leg-logo{height:30px;width:auto;display:block;margin:10px auto 0;}
   .brand-logo{height:84px;width:auto;max-width:340px;display:block;}
   .colegiada{display:flex;flex-direction:column;gap:3px;}
   .colegiada .cap{font-size:8.5px;font-weight:700;letter-spacing:.13em;text-transform:uppercase;color:var(--muted);}
@@ -271,6 +272,8 @@
   .arch-load:hover{background:#e9f3fc;border-color:var(--blue);}
   .arch-num{font-weight:700;color:var(--navy);font-size:12.5px;}
   .arch-fecha{color:var(--muted);font-size:11.5px;font-variant-numeric:tabular-nums;}
+  .arch-dup{border:none;background:none;color:var(--blue);font-size:15px;line-height:1;cursor:pointer;padding:0 5px;}
+  .arch-dup:hover{color:var(--navy);}
   .arch-del{border:none;background:none;color:#c0392b;font-size:16px;line-height:1;cursor:pointer;padding:0 4px;}
   .arch-del:hover{color:#e74c3c;}
 </style>
@@ -329,9 +332,6 @@
   <div class="head">
     <div class="brand">
       <img class="brand-logo" src="logo.png" alt="Elena Espigares Martínez · Asesoría Fiscal y Contable">
-      <div class="colegiada">
-        <img src="colegio.png" width="150" height="35" alt="Colegio Profesional de Economistas de Granada">
-      </div>
     </div>
 
     <div class="issuer" id="emisorBody">
@@ -414,6 +414,7 @@
     <div class="leg-mid">Asesoría Fiscal y Contable</div>
     <div class="leg-fine">Factura emitida conforme al RD 1619/2012. Conserve este documento como justificante.</div>
     <div class="leg-fine">Sus datos se tratan conforme al RGPD con la única finalidad de la relación profesional y la facturación.</div>
+    <img class="leg-logo" src="colegio.png" width="150" height="35" alt="Colegio Profesional de Economistas de Granada">
   </div>
 
 </div>
@@ -535,6 +536,7 @@
         `<div class="arch-items">` + items.map(r=>
           `<div class="arch-item"><button class="arch-load" data-load="${esc(r.numero)}" title="Editar esta factura">`+
           `<span class="arch-num">${esc(r.numero)}</span><span class="arch-fecha">${esc(r.fecha)}</span></button>`+
+          `<button class="arch-dup" data-dup="${esc(r.numero)}" title="Duplicar (mismo cliente, nº siguiente)">⧉</button>`+
           `<button class="arch-del" data-del="${esc(r.numero)}" title="Quitar del archivo">×</button></div>`).join('') +
         `</div></div>`;
     }).join('');
@@ -557,6 +559,39 @@
     calc();
     cerrarArchivo();
     toast('Factura ' + num + ' cargada. Edítala y pulsa 💾 Guardar para actualizarla.');
+  }
+
+  // nº correlativo siguiente al más alto del archivo
+  function siguienteNumeroArchivo(){
+    const arr = getArchivo();
+    let best=null, bestVal=-1;
+    arr.forEach(r=>{ const m=String(r.numero||'').match(/(\d+)(?!.*\d)/); const v=m?parseInt(m[1],10):-1; if(v>bestVal){ bestVal=v; best=r.numero; } });
+    const metas=document.querySelectorAll('#metaTable .v');
+    const actual = metas[0] ? metas[0].textContent : '';
+    return best!=null ? nextNumero(best) : nextNumero(actual);
+  }
+
+  function duplicarFactura(num){
+    const r = getArchivo().find(x=>x.numero===num);
+    if(!r){ toast('No se encontró la factura.'); return; }
+    const s = r.snap;
+    // se copian SOLO cliente, conceptos e IVA/retención; los datos de emisor y forma de pago se mantienen los actuales
+    $('clienteBody').innerHTML = s.cliente;
+    $('rows').innerHTML        = s.rows;
+    if(s.iva!=null) $('ivaPct').value = s.iva;
+    if(s.ret!=null) $('retPct').value = s.ret;
+    if(typeof s.retEnabled === 'boolean') retEnabled = s.retEnabled;
+    document.querySelector('.ret-row').style.display = retEnabled ? '' : 'none';
+    $('retToggle').textContent = retEnabled ? 'Quitar retención' : 'Añadir retención';
+    // número siguiente + fecha de hoy
+    const metas = document.querySelectorAll('#metaTable .v');
+    const nuevo = siguienteNumeroArchivo();
+    if(metas[0]) metas[0].textContent = nuevo;
+    if(metas[1]) metas[1].textContent = hoyDDMMYYYY(0);
+    if(metas[2]) metas[2].textContent = hoyDDMMYYYY(30);
+    calc();
+    cerrarArchivo();
+    toast('Factura duplicada como nº ' + nuevo + ' (mismo cliente, fecha de hoy). Revísala y guarda 💾.');
   }
 
   function borrarFactura(num){
@@ -658,19 +693,23 @@
     const filename = 'Factura-' + safe + '.pdf';
     document.body.classList.add('exporting');
     const prevScroll = window.scrollY;
-    window.scrollTo(0, 0);   // captura desde arriba (si no, html2canvas corta por donde esté el scroll)
+    window.scrollTo(0, 0);
     const el = document.querySelector('.sheet');
+    const prevStyle = el.getAttribute('style') || '';
+    // CLAVE anti-corte: fijar la hoja en la esquina (0,0), sin centrar; detrás de todo para que no parpadee.
+    el.style.cssText += ';margin:0;';   // sin centrar: evita el corte lateral en la captura
     try{
       const worker = html2pdf().set({
         margin: 0, filename,
         image: {type:'jpeg', quality:0.98},
-        html2canvas: {scale:2, useCORS:true, backgroundColor:'#ffffff', windowWidth:794, scrollX:0, scrollY:0, onclone:function(dd){ dd.body.classList.add('exporting'); }}
+        html2canvas: {scale:2, useCORS:true, backgroundColor:'#ffffff', scrollX:0, scrollY:0, windowWidth:900, onclone:function(dd){ dd.body.classList.add('exporting'); var s=dd.querySelector('.sheet'); if(s){ s.style.margin='0'; } }}
       }).from(el);
       const canvas = await worker.toCanvas().get('canvas');
       const hmm = 210 * canvas.height / canvas.width + 1;   // página al tamaño REAL del lienzo → 1 sola página
       const blob = await worker.set({ jsPDF:{unit:'mm', format:[210, hmm], orientation:'portrait'} }).toPdf().outputPdf('blob');
       return {blob, filename, d};
     } finally {
+      el.setAttribute('style', prevStyle);
       document.body.classList.remove('exporting');
       window.scrollTo(0, prevScroll);
     }
@@ -693,54 +732,34 @@
   }
 
   async function enviar(canal){
-    if(typeof html2pdf === 'undefined'){
-      toast('Necesitas conexión a internet la primera vez para preparar el PDF.');
-      return;
-    }
     const d = datos();
     const texto = `Hola, le adjunto la factura nº ${d.num} por un importe total de ${d.total}. Un saludo, ${d.emisor}.`;
-    const compartir = puedeCompartirArchivos();
     archivarActual(true);   // al enviarla, queda guardada en el archivo
 
-    // En ORDENADOR abrimos WhatsApp en el mismo clic, así el navegador no lo bloquea
-    let waWin = null;
-    if(!compartir && canal === 'whatsapp'){
-      waWin = window.open('https://wa.me/?text=' + encodeURIComponent(texto), '_blank');
-    }
-
-    const btn = document.querySelector(canal === 'whatsapp' ? '.wa' : '.mail');
-    const prev = btn ? btn.textContent : '';
-    if(btn){ btn.disabled = true; btn.textContent = 'Preparando…'; }
-    toast('Generando el PDF…', 9000);
-
-    try{
-      const {blob, filename} = await generarPDF();
-
-      // MÓVIL / Edge: menú de compartir con el PDF YA adjunto → solo elige chat o correo
-      if(compartir){
+    // MÓVIL: adjunta el PDF automáticamente al menú de compartir
+    if(puedeCompartirArchivos() && typeof html2pdf !== 'undefined'){
+      const btn = document.querySelector(canal === 'whatsapp' ? '.wa' : '.mail');
+      const prev = btn ? btn.textContent : '';
+      if(btn){ btn.disabled = true; btn.textContent = 'Preparando…'; }
+      toast('Generando el PDF…', 9000);
+      try{
+        const {blob, filename} = await generarPDF();
         const file = new File([blob], filename, {type:'application/pdf'});
-        try{
-          await navigator.share({files:[file], title:'Factura ' + d.num, text:texto});
-          return;
-        }catch(e){ if(e && e.name === 'AbortError') return; /* si falla, plan B */ }
-      }
-
-      // ORDENADOR (Windows): descarga el PDF y deja el canal abierto con el mensaje escrito
-      descargar(blob, filename);
-      if(canal === 'whatsapp'){
-        if(!waWin) window.open('https://wa.me/?text=' + encodeURIComponent(texto), '_blank');
-        toast('La factura (PDF) está en tu carpeta Descargas. Arrástrala al chat de WhatsApp y elige el contacto.', 9000);
-      } else {
-        const asunto = 'Factura nº ' + d.num + ' — ' + d.emisor;
-        window.location.href = 'mailto:?subject=' + encodeURIComponent(asunto) + '&body=' + encodeURIComponent(texto);
-        toast('La factura (PDF) está en tu carpeta Descargas. Adjúntala al correo y pon el destinatario.', 9000);
-      }
-    }catch(e){
-      if(waWin) waWin.close();
-      toast('No se pudo preparar el PDF. Revisa tu internet e inténtalo de nuevo.', 7000);
-    }finally{
-      if(btn){ btn.disabled = false; btn.textContent = prev; }
+        await navigator.share({files:[file], title:'Factura ' + d.num, text:texto});
+      }catch(e){ if(!(e && e.name === 'AbortError')) toast('No se pudo compartir. Usa el botón Imprimir / PDF.', 6000); }
+      finally{ if(btn){ btn.disabled = false; btn.textContent = prev; } }
+      return;
     }
+
+    // ORDENADOR: el PDF lo genera la IMPRESIÓN del navegador (sale entero siempre) y abrimos el canal
+    if(canal === 'whatsapp'){
+      window.open('https://wa.me/?text=' + encodeURIComponent(texto), '_blank');
+      toast('Se abrirá la impresión: elige "Guardar como PDF" y arrastra ese archivo al WhatsApp que se ha abierto.', 11000);
+    } else {
+      window.location.href = 'mailto:?subject=' + encodeURIComponent('Factura nº ' + d.num + ' — ' + d.emisor) + '&body=' + encodeURIComponent(texto);
+      toast('Se abrirá la impresión: elige "Guardar como PDF" y adjúntala al correo que se ha abierto.', 11000);
+    }
+    setTimeout(function(){ imprimir(); }, 500);
   }
 
   /* ---------- Asistente IA (Claude) ---------- */
@@ -873,6 +892,8 @@
   $('archivoList').addEventListener('click', function(e){
     const del = e.target.closest('[data-del]');
     if(del){ borrarFactura(del.getAttribute('data-del')); return; }
+    const dup = e.target.closest('[data-dup]');
+    if(dup){ duplicarFactura(dup.getAttribute('data-dup')); return; }
     const load = e.target.closest('[data-load]');
     if(load){ cargarFactura(load.getAttribute('data-load')); return; }
   });
