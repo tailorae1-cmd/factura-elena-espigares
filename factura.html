@@ -4,6 +4,9 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="robots" content="noindex, nofollow">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
 <title>Factura — Elena Espigares Martínez</title>
 <style>
   :root{
@@ -296,7 +299,7 @@
   <button class="primary" onclick="imprimir()">🖨️ Imprimir / PDF</button>
   <button class="wa" onclick="enviar('whatsapp')">WhatsApp</button>
   <button class="mail" onclick="enviar('email')">Email</button>
-  <div class="hint">Toca cualquier texto (subrayado) para editarlo. Tus datos se guardan solos en este dispositivo. O usa el asistente de abajo para rellenarla escribiendo o subiendo una foto.</div>
+  <div class="hint">Toca cualquier texto (subrayado) para editarlo. Tus datos se guardan solos en este dispositivo. O usa el asistente de abajo para rellenarla escribiendo o subiendo una foto.<span style="opacity:.55"> · v5</span></div>
 </div>
 
 <!-- ARCHIVO DE FACTURAS (cajón izquierdo) -->
@@ -724,11 +727,19 @@
 
   /* ---------- enviar por WhatsApp / Email ---------- */
   function puedeCompartirArchivos(){
-    // true en móvil (y en Edge de Windows): el sistema adjunta el PDF solo
     try{
       const dummy = new File([new Blob(['x'], {type:'application/pdf'})], 'x.pdf', {type:'application/pdf'});
       return !!(navigator.canShare && navigator.canShare({files:[dummy]}));
     }catch(_){ return false; }
+  }
+  // Sólo móvil/tablet REAL. En ordenador (incluido Edge de Windows, que también permite compartir
+  // archivos) NO usamos html2pdf: usamos la impresión del navegador, que nunca corta la factura.
+  function esMovil(){
+    const ua = navigator.userAgent || '';
+    if(/Android|iPhone|iPad|iPod|Mobile|Windows Phone|IEMobile|Opera Mini/i.test(ua)) return true;
+    const tactil = (navigator.maxTouchPoints || 0) > 1;
+    const grueso = !!(window.matchMedia && window.matchMedia('(pointer: coarse)').matches);
+    return tactil && grueso && Math.min(screen.width, screen.height) < 820;
   }
 
   async function enviar(canal){
@@ -736,8 +747,8 @@
     const texto = `Hola, le adjunto la factura nº ${d.num} por un importe total de ${d.total}. Un saludo, ${d.emisor}.`;
     archivarActual(true);   // al enviarla, queda guardada en el archivo
 
-    // MÓVIL: adjunta el PDF automáticamente al menú de compartir
-    if(puedeCompartirArchivos() && typeof html2pdf !== 'undefined'){
+    // MÓVIL de verdad: adjunta el PDF automáticamente al menú de compartir
+    if(esMovil() && puedeCompartirArchivos() && typeof html2pdf !== 'undefined'){
       const btn = document.querySelector(canal === 'whatsapp' ? '.wa' : '.mail');
       const prev = btn ? btn.textContent : '';
       if(btn){ btn.disabled = true; btn.textContent = 'Preparando…'; }
