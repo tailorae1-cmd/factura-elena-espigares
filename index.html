@@ -309,23 +309,6 @@
   <div class="arch-list" id="archivoList"></div>
 </aside>
 
-<!-- ASISTENTE IA -->
-<div class="ai-panel">
-  <div class="ai-head">
-    <span class="ai-title">✨ Asistente · rellena la factura por ti</span>
-    <button class="ai-key" onclick="configurarClave()" title="Configurar la clave de IA (se guarda solo en este dispositivo)">⚙️ Clave IA</button>
-  </div>
-  <textarea id="aiText" class="ai-text" rows="2" placeholder="Escribe o pega aquí los datos del cliente y los conceptos. Ej.: «Factura para Bar Pepe, NIF B12345678, calle Mayor 3, Granada. Asesoría mensual 120€ y modelo 303 60€.»"></textarea>
-  <div class="ai-actions">
-    <label class="ai-photo">📷 Subir foto
-      <input id="aiPhoto" type="file" accept="image/*" hidden>
-    </label>
-    <span id="aiPhotoName" class="ai-photoname"></span>
-    <span style="flex:1"></span>
-    <button class="ai-go" onclick="rellenarConIA()">Rellenar factura ✨</button>
-  </div>
-</div>
-
 <div class="sheet">
 
   <!-- CABECERA -->
@@ -393,7 +376,7 @@
       <h4>Forma de pago</h4>
       <div class="box" id="payBox">
         <div contenteditable>Transferencia bancaria</div>
-        <div>IBAN: <span class="iban" contenteditable>ES00 0000 0000 00 0000000000</span></div>
+        <div>IBAN: <span class="iban" contenteditable>ES78 2100 5814 1413 0025 0128</span></div>
         <div contenteditable style="margin-top:6px;color:var(--muted)">Pago a 30 días desde la fecha de emisión.</div>
       </div>
     </div>
@@ -417,6 +400,23 @@
     <img class="leg-logo" src="colegio.png" width="150" height="35" alt="Colegio Profesional de Economistas de Granada">
   </div>
 
+</div>
+
+<!-- ASISTENTE IA (debajo de la factura) -->
+<div class="ai-panel">
+  <div class="ai-head">
+    <span class="ai-title">✨ Asistente · rellena la factura por ti</span>
+    <button class="ai-key" onclick="configurarClave()" title="Configurar la clave de IA (se guarda solo en este dispositivo)">⚙️ Clave IA</button>
+  </div>
+  <textarea id="aiText" class="ai-text" rows="2" placeholder="Escribe o pega aquí los datos del cliente y los conceptos. Ej.: «Factura para Bar Pepe, NIF B12345678, calle Mayor 3, Granada. Asesoría mensual 120€ y modelo 303 60€.»"></textarea>
+  <div class="ai-actions">
+    <label class="ai-photo">📷 Subir foto
+      <input id="aiPhoto" type="file" accept="image/*" hidden>
+    </label>
+    <span id="aiPhotoName" class="ai-photoname"></span>
+    <span style="flex:1"></span>
+    <button class="ai-go" onclick="rellenarConIA()">Rellenar factura ✨</button>
+  </div>
 </div>
 
 <div class="toast" id="toast"></div>
@@ -900,7 +900,7 @@
   renderArchivo();
 
   // plantilla de datos fijos (emisor + forma de pago) tal cual están en el HTML
-  const FIX_VER = 'datos2';
+  const FIX_VER = 'datos3';
   const TPL_EMISOR = $('emisorBody').innerHTML;
   const TPL_PAY = $('payBox').innerHTML;
 
