@@ -280,7 +280,7 @@
   .arch-del{border:none;background:none;color:#c0392b;font-size:16px;line-height:1;cursor:pointer;padding:0 4px;}
   .arch-del:hover{color:#e74c3c;}
 </style>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 </head>
 <body>
 
@@ -299,7 +299,7 @@
   <button class="primary" onclick="imprimir()">🖨️ Imprimir / PDF</button>
   <button class="wa" onclick="enviar('whatsapp')">WhatsApp</button>
   <button class="mail" onclick="enviar('email')">Email</button>
-  <div class="hint">Toca cualquier texto (subrayado) para editarlo. Tus datos se guardan solos en este dispositivo. O usa el asistente de abajo para rellenarla escribiendo o subiendo una foto.<span style="opacity:.55"> · v6</span></div>
+  <div class="hint">Toca cualquier texto (subrayado) para editarlo. Tus datos se guardan solos en este dispositivo. O usa el asistente de abajo para rellenarla escribiendo o subiendo una foto.<span style="opacity:.55"> · v7</span></div>
 </div>
 
 <!-- ARCHIVO DE FACTURAS (cajón izquierdo) -->
@@ -689,32 +689,141 @@
   }
 
   /* ---------- generar el PDF como archivo ---------- */
+  // PDF VECTORIAL con jsPDF: se DIBUJA la factura (no se fotografía la pantalla).
+  // Es idéntico en cualquier equipo (inmune a zoom/escala), nunca se corta, y da un archivo para adjuntar.
   async function generarPDF(){
     const d = datos();
     const safe = (d.num || 'factura').replace(/[^\w\-]+/g,'_');
     const filename = 'Factura-' + safe + '.pdf';
-    document.body.classList.add('exporting');
-    const prevScroll = window.scrollY;
-    window.scrollTo(0, 0);
-    const el = document.querySelector('.sheet');
-    const prevStyle = el.getAttribute('style') || '';
-    // CLAVE anti-corte: fijar la hoja en la esquina (0,0), sin centrar; detrás de todo para que no parpadee.
-    el.style.cssText += ';margin:0;';   // sin centrar: evita el corte lateral en la captura
-    try{
-      const worker = html2pdf().set({
-        margin: 0, filename,
-        image: {type:'jpeg', quality:0.98},
-        html2canvas: {scale:2, useCORS:true, backgroundColor:'#ffffff', scrollX:0, scrollY:0, windowWidth:900, onclone:function(dd){ dd.body.classList.add('exporting'); var s=dd.querySelector('.sheet'); if(s){ s.style.margin='0'; } }}
-      }).from(el);
-      const canvas = await worker.toCanvas().get('canvas');
-      const hmm = 210 * canvas.height / canvas.width + 1;   // página al tamaño REAL del lienzo → 1 sola página
-      const blob = await worker.set({ jsPDF:{unit:'mm', format:[210, hmm], orientation:'portrait'} }).toPdf().outputPdf('blob');
-      return {blob, filename, d};
-    } finally {
-      el.setAttribute('style', prevStyle);
-      document.body.classList.remove('exporting');
-      window.scrollTo(0, prevScroll);
+    archivarActual(true);
+    const jsPDFctor = (window.jspdf && window.jspdf.jsPDF) || window.jsPDF;
+    if(!jsPDFctor) throw new Error('jsPDF no disponible');
+    const doc = new jsPDFctor({unit:'mm', format:'a4', orientation:'portrait'});
+
+    const NAVY=[20,51,95], BLUE=[46,109,180], INK=[28,39,51], MUT=[107,119,133],
+          LINE=[210,219,229], ROW=[244,247,250], WHITE=[255,255,255], SOFT=[60,72,86];
+    const ML=14, MR=196, CW=182;            // márgenes y ancho útil
+    const sf=c=>doc.setFillColor(c[0],c[1],c[2]);
+    const st=c=>doc.setTextColor(c[0],c[1],c[2]);
+    const sd=c=>doc.setDrawColor(c[0],c[1],c[2]);
+    const T=t=>String(t==null?'':t).replace(/ /g,' ').replace(/[−–—]/g,'-').trim();
+
+    // escala un <img> a un ancho máx. y devuelve dataURL PNG (mantiene transparencia, peso bajo)
+    function imgData(img, maxW){
+      if(!img || !img.complete || !img.naturalWidth) return null;
+      const s=Math.min(1, maxW/img.naturalWidth);
+      const w=Math.max(1,Math.round(img.naturalWidth*s)), h=Math.max(1,Math.round(img.naturalHeight*s));
+      const cv=document.createElement('canvas'); cv.width=w; cv.height=h;
+      cv.getContext('2d').drawImage(img,0,0,w,h);
+      return {url:cv.toDataURL('image/png'), ratio:img.naturalHeight/img.naturalWidth};
     }
+
+    // ---- datos del DOM ----
+    const emisorRows=[...document.querySelectorAll('#emisorBody .row')].map(r=>T(r.textContent)).filter(Boolean);
+    const cliNombre=T((document.querySelector('#clienteBody .nm')||{}).textContent);
+    const cliRows=[...document.querySelectorAll('#clienteBody .row')].map(r=>T(r.textContent)).filter(Boolean);
+    const metaVals=[...document.querySelectorAll('#metaTable .v')].map(v=>T(v.textContent));
+    const filas=[...document.querySelectorAll('#rows tr')].map(tr=>{const td=tr.querySelectorAll('td');return{c:T(td[0].textContent),u:T(td[1].textContent),p:T(td[2].textContent),imp:T(td[3]?td[3].textContent:'')};});
+    const payLines=[...document.querySelectorAll('#payBox > div')].map(x=>T(x.textContent)).filter(Boolean);
+    const baseTxt=T($('base').textContent), ivaTxt=T($('iva').textContent), retTxt=T($('ret').textContent), totTxt=T($('total').textContent);
+    const ivaLbl=T($('ivaLbl').textContent), retLbl=T($('retLbl').textContent);
+
+    // ---- cabecera: logo + emisor ----
+    const logoD=imgData(document.querySelector('.brand-logo'), 320);
+    let logoBottom=14;
+    try{ if(logoD){ const lw=46, lh=lw*logoD.ratio; doc.addImage(logoD.url,'PNG',ML,14,lw,lh); logoBottom=14+lh; } }catch(e){}
+    doc.setFont('helvetica','normal'); doc.setFontSize(8.6);
+    let ey=16.5;
+    emisorRows.forEach((r,i)=>{ st(i===0?NAVY:MUT); doc.text(r, MR, ey, {align:'right'}); ey+=4.3; });
+    const ruleY=Math.max(logoBottom+3, ey+1);
+    sd(NAVY); doc.setLineWidth(0.7); doc.line(ML, ruleY, MR, ruleY);
+
+    // ---- FACTURA + meta (izq) ----
+    st(NAVY); doc.setFont('helvetica','bold'); doc.setFontSize(23);
+    const facY=ruleY+13; doc.text('FACTURA', ML, facY);
+    doc.setFontSize(9); let my=facY+9;
+    ['Nº FACTURA','FECHA','VENCIMIENTO'].forEach((lb,i)=>{
+      doc.setFont('helvetica','normal'); st(MUT); doc.text(lb, ML, my);
+      doc.setFont('helvetica','bold'); st(INK); doc.text(T(metaVals[i]), ML+34, my); my+=6.2;
+    });
+
+    // ---- Cliente (der) ----
+    const cardX=106, cardW=MR-cardX, cardY=ruleY+8;
+    sf(BLUE); doc.roundedRect(cardX, cardY, cardW, 8, 1.4,1.4,'F');
+    st(WHITE); doc.setFont('helvetica','bold'); doc.setFontSize(9); doc.text('CLIENTE', cardX+4, cardY+5.4);
+    let cy=cardY+14.5; st(INK); doc.setFont('helvetica','bold'); doc.setFontSize(10.5);
+    doc.splitTextToSize(cliNombre||' ', cardW-2).slice(0,2).forEach(l=>{ doc.text(l, cardX+1, cy); cy+=5; }); cy+=0.5;
+    doc.setFont('helvetica','normal'); doc.setFontSize(9); st(SOFT);
+    cliRows.forEach(r=>{ doc.splitTextToSize(r, cardW-2).forEach(l=>{ doc.text(l, cardX+1, cy); cy+=4.7; }); });
+
+    // ---- Tabla de conceptos ----
+    let ty=Math.max(my+2, cy+2, ruleY+44)+6;
+    const udsX=139, preX=167, impX=MR;
+    const tblTop=ty;
+    sf(NAVY); doc.rect(ML, ty, CW, 9, 'F');
+    st(WHITE); doc.setFont('helvetica','bold'); doc.setFontSize(8.5);
+    doc.text('CONCEPTO', ML+2, ty+5.9);
+    doc.text('UDS.', udsX, ty+5.9, {align:'right'});
+    doc.text('PRECIO (€)', preX, ty+5.9, {align:'right'});
+    doc.text('IMPORTE (€)', impX-2, ty+5.9, {align:'right'});
+    ty+=9;
+    doc.setFontSize(9.4);
+    filas.forEach((f,i)=>{
+      const cLines=doc.splitTextToSize(f.c||' ', 116);
+      const rh=Math.max(9, 4+cLines.length*4.6);
+      if(i%2===1){ sf(ROW); doc.rect(ML, ty, CW, rh, 'F'); }
+      st(INK); doc.setFont('helvetica','normal');
+      cLines.forEach((l,k)=>doc.text(l, ML+2, ty+5.9+k*4.6));
+      doc.text(T(f.u), udsX, ty+5.9, {align:'right'});
+      doc.text(T(f.p), preX, ty+5.9, {align:'right'});
+      doc.setFont('helvetica','bold'); doc.text(T(f.imp), impX-2, ty+5.9, {align:'right'});
+      ty+=rh;
+    });
+    sd(LINE); doc.setLineWidth(0.3); doc.rect(ML, tblTop, CW, ty-tblTop, 'S');
+
+    // ---- Forma de pago (izq) + Resumen (der) ----
+    let fy=ty+12;
+    st(NAVY); doc.setFont('helvetica','bold'); doc.setFontSize(9); doc.text('FORMA DE PAGO', ML, fy);
+    const payY=fy+3, payW=84, payH=6.5+payLines.length*5.2;
+    sf([245,248,251]); sd(LINE); doc.setLineWidth(0.3); doc.roundedRect(ML, payY, payW, payH, 1.4,1.4,'FD');
+    let pyy=payY+6; doc.setFontSize(9); st(INK);
+    payLines.forEach(l=>{
+      const mm=l.match(/^(IBAN:?)(\s*)(.*)$/i);
+      if(mm){ doc.setFont('helvetica','normal'); doc.text(mm[1]+' ', ML+3, pyy); const off=doc.getTextWidth(mm[1]+' '); doc.setFont('helvetica','bold'); doc.text(mm[3], ML+3+off, pyy); }
+      else { doc.setFont('helvetica','normal'); doc.text(l, ML+3, pyy); }
+      pyy+=5.2;
+    });
+    // resumen
+    const totX=110, totW=MR-totX;
+    sf(BLUE); doc.roundedRect(totX, fy, totW, 8, 1.4,1.4,'F');
+    st(WHITE); doc.setFont('helvetica','bold'); doc.setFontSize(9); doc.text('RESUMEN', totX+4, fy+5.4);
+    let ry=fy+8;
+    const rowT=(label,val,opt)=>{
+      opt=opt||{};
+      if(opt.fill){ sf(NAVY); doc.rect(totX, ry, totW, 9, 'F'); }
+      st(opt.fill?WHITE:(opt.mut?MUT:INK)); doc.setFont('helvetica', opt.bold?'bold':'normal'); doc.setFontSize(opt.fill?10:9);
+      const yy=ry+(opt.fill?6:5.9);
+      doc.text(label, totX+4, yy);
+      doc.setFont('helvetica','bold'); doc.text(val, MR-4, yy, {align:'right'});
+      sd(LINE); doc.setLineWidth(0.25); if(!opt.fill) doc.line(totX, ry+7.4, MR, ry+7.4);
+      ry+=opt.fill?9:7.4;
+    };
+    rowT('Base imponible', baseTxt, {});
+    rowT('IVA ('+ivaLbl+'%)', ivaTxt, {mut:true});
+    if(retEnabled) rowT('Retención IRPF ('+retLbl+'%)', retTxt, {mut:true});
+    rowT('TOTAL', totTxt, {fill:true, bold:true});
+
+    // ---- pie centrado ----
+    const cx=105; let foY=Math.max(ry+14, 276);
+    st(NAVY); doc.setFont('helvetica','bold'); doc.setFontSize(9.5); doc.text('Asesoría Fiscal y Contable', cx, foY, {align:'center'});
+    doc.setFont('helvetica','normal'); doc.setFontSize(7.6); st(MUT);
+    doc.text('Factura emitida conforme al RD 1619/2012. Conserve este documento como justificante.', cx, foY+4.5, {align:'center'});
+    doc.text('Sus datos se tratan conforme al RGPD con la única finalidad de la relación profesional y la facturación.', cx, foY+8.2, {align:'center'});
+    const colD=imgData(document.querySelector('.leg-logo'), 240);
+    try{ if(colD){ const w=30, h=w*colD.ratio; doc.addImage(colD.url,'PNG', cx-w/2, foY+10.5, w, h); } }catch(e){}
+
+    const blob = doc.output('blob');
+    return {blob, filename, d};
   }
   function descargar(blob, filename){
     const url = URL.createObjectURL(blob);
@@ -744,32 +853,39 @@
   async function enviar(canal){
     const d = datos();
     const texto = `Hola, le adjunto la factura nº ${d.num} por un importe total de ${d.total}. Un saludo, ${d.emisor}.`;
-    archivarActual(true);   // al enviarla, queda guardada en el archivo
+    const btn = document.querySelector(canal === 'whatsapp' ? '.wa' : '.mail');
+    const prev = btn ? btn.textContent : '';
+    if(btn){ btn.disabled = true; btn.textContent = 'Preparando…'; }
+    toast('Generando el PDF…', 9000);
 
-    // MÓVIL de verdad: adjunta el PDF automáticamente al menú de compartir
-    if(esMovil() && puedeCompartirArchivos() && typeof html2pdf !== 'undefined'){
-      const btn = document.querySelector(canal === 'whatsapp' ? '.wa' : '.mail');
-      const prev = btn ? btn.textContent : '';
-      if(btn){ btn.disabled = true; btn.textContent = 'Preparando…'; }
-      toast('Generando el PDF…', 9000);
+    let res;
+    try{ res = await generarPDF(); }
+    catch(e){ if(btn){ btn.disabled = false; btn.textContent = prev; } toast('No se pudo generar el PDF. Inténtalo de nuevo.', 7000); return; }
+    const {blob, filename} = res;
+
+    // 1) Si el dispositivo puede ADJUNTAR archivos (móvil y Edge/Windows): menú de compartir con el PDF YA puesto
+    if(puedeCompartirArchivos()){
       try{
-        const {blob, filename} = await generarPDF();
         const file = new File([blob], filename, {type:'application/pdf'});
         await navigator.share({files:[file], title:'Factura ' + d.num, text:texto});
-      }catch(e){ if(!(e && e.name === 'AbortError')) toast('No se pudo compartir. Usa el botón Imprimir / PDF.', 6000); }
-      finally{ if(btn){ btn.disabled = false; btn.textContent = prev; } }
-      return;
+        if(btn){ btn.disabled = false; btn.textContent = prev; }
+        return;
+      }catch(e){
+        if(e && e.name === 'AbortError'){ if(btn){ btn.disabled = false; btn.textContent = prev; } return; }
+        /* si el compartir falla por otra cosa, seguimos al plan B */
+      }
     }
 
-    // ORDENADOR: el PDF lo genera la IMPRESIÓN del navegador (sale entero siempre) y abrimos el canal
+    // 2) Plan B (ordenadores que no comparten archivos): descarga el PDF y abre el canal con el mensaje
+    descargar(blob, filename);
     if(canal === 'whatsapp'){
       window.open('https://wa.me/?text=' + encodeURIComponent(texto), '_blank');
-      toast('Se abrirá la impresión: elige "Guardar como PDF" y arrastra ese archivo al WhatsApp que se ha abierto.', 11000);
+      toast('PDF descargado (carpeta Descargas). Arrástralo al chat de WhatsApp que se ha abierto.', 9000);
     } else {
       window.location.href = 'mailto:?subject=' + encodeURIComponent('Factura nº ' + d.num + ' — ' + d.emisor) + '&body=' + encodeURIComponent(texto);
-      toast('Se abrirá la impresión: elige "Guardar como PDF" y adjúntala al correo que se ha abierto.', 11000);
+      toast('PDF descargado (carpeta Descargas). Adjúntalo al correo que se ha abierto.', 9000);
     }
-    setTimeout(function(){ imprimir(); }, 500);
+    if(btn){ btn.disabled = false; btn.textContent = prev; }
   }
 
   /* ---------- Asistente IA (Claude) ---------- */
