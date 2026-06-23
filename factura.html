@@ -299,7 +299,7 @@
   <button class="primary" onclick="imprimir()">🖨️ Imprimir / PDF</button>
   <button class="wa" onclick="enviar('whatsapp')">WhatsApp</button>
   <button class="mail" onclick="enviar('email')">Email</button>
-  <div class="hint">Toca cualquier texto (subrayado) para editarlo. Tus datos se guardan solos en este dispositivo. O usa el asistente de abajo para rellenarla escribiendo o subiendo una foto.<span style="opacity:.55"> · v7</span></div>
+  <div class="hint">Toca cualquier texto (subrayado) para editarlo. Tus datos se guardan solos en este dispositivo. O usa el asistente de abajo para rellenarla escribiendo o subiendo una foto.<span style="opacity:.55"> · v8</span></div>
 </div>
 
 <!-- ARCHIVO DE FACTURAS (cajón izquierdo) -->
@@ -681,11 +681,23 @@
   }
 
   /* ---------- imprimir / guardar PDF ---------- */
-  function imprimir(){
-    archivarActual(true);
-    document.body.classList.add('exporting');
-    window.print();
-    setTimeout(()=>document.body.classList.remove('exporting'), 800);
+  // Usa el MISMO PDF vectorial (nunca se corta). Lo abre en una pestaña para verlo,
+  // imprimirlo o guardarlo; si el navegador bloquea la ventana, lo descarga.
+  async function imprimir(){
+    toast('Generando el PDF…', 8000);
+    let res;
+    try{ res = await generarPDF(); }
+    catch(e){ toast('No se pudo generar el PDF. Inténtalo de nuevo.', 6000); return; }
+    const {blob, filename} = res;
+    const url = URL.createObjectURL(blob);
+    const w = window.open(url, '_blank');
+    if(!w){
+      descargar(blob, filename);
+      toast('PDF guardado en Descargas. Ábrelo para imprimirlo o enviarlo.', 8000);
+    } else {
+      toast('PDF abierto: desde ahí puedes imprimirlo o guardarlo.', 7000);
+    }
+    setTimeout(()=>URL.revokeObjectURL(url), 60000);
   }
 
   /* ---------- generar el PDF como archivo ---------- */
