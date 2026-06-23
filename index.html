@@ -299,7 +299,7 @@
   <button class="primary" onclick="imprimir()">🖨️ Imprimir / PDF</button>
   <button class="wa" onclick="enviar('whatsapp')">WhatsApp</button>
   <button class="mail" onclick="enviar('email')">Email</button>
-  <div class="hint">Toca cualquier texto (subrayado) para editarlo. Tus datos se guardan solos en este dispositivo. O usa el asistente de abajo para rellenarla escribiendo o subiendo una foto.<span style="opacity:.55"> · v8</span></div>
+  <div class="hint">Toca cualquier texto (subrayado) para editarlo. Tus datos se guardan solos en este dispositivo. O usa el asistente de abajo para rellenarla escribiendo o subiendo una foto.<span style="opacity:.55"> · v9</span></div>
 </div>
 
 <!-- ARCHIVO DE FACTURAS (cajón izquierdo) -->
@@ -781,7 +781,7 @@
     ty+=9;
     doc.setFontSize(9.4);
     filas.forEach((f,i)=>{
-      const cLines=doc.splitTextToSize(f.c||' ', 116);
+      const cLines=doc.splitTextToSize(f.c||' ', 86);   // mismo ancho de columna que en pantalla → envuelve igual
       const rh=Math.max(9, 4+cLines.length*4.6);
       if(i%2===1){ sf(ROW); doc.rect(ML, ty, CW, rh, 'F'); }
       st(INK); doc.setFont('helvetica','normal');
